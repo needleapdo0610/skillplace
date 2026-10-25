@@ -7,6 +7,8 @@ Usage (run from the repository root):
   kb.py check              fail on dead covers patterns, dead path references, stale map
   kb.py changed [BASE]     list docs governing files changed since BASE (default origin/HEAD)
                            and flag docs the diff did not touch; exit 1 if any
+  kb.py stale              list docs whose covered files have commits after the doc's
+                           `last_verified: <date> @ <sha>`; exit 1 if any
 """
 import re
 import subprocess
@@ -140,8 +142,35 @@ def cmd_changed(base, docs):
     return 1 if stale else 0
 
 
+VERIFIED_RE = re.compile(r"@\s*([0-9a-f]{7,40})\b")
+
+
+def cmd_stale(docs):
+    stale, problems = {}, []
+    for doc, meta in sorted(docs.items()):
+        match = VERIFIED_RE.search(str(meta.get("last_verified", "")))
+        if not match:
+            problems.append(f"{doc}: last_verified has no '@ <sha>'")
+            continue
+        try:
+            names = git("log", f"{match.group(1)}..HEAD", "--name-only", "--format=").splitlines()
+        except subprocess.CalledProcessError:
+            problems.append(f"{doc}: last_verified sha not found: {match.group(1)}")
+            continue
+        newer = sorted({f for f in names if f and owner(f, docs) == doc and not SKIP_CHANGED.search(f)})
+        if newer:
+            stale[doc] = newer
+    for doc, srcs in stale.items():
+        print(f"{doc} stale: {len(srcs)} governed files changed since last_verified, e.g. {', '.join(srcs[:3])}")
+    for p in problems:
+        print(f"ERROR {p}")
+    if not stale and not problems:
+        print("no stale docs")
+    return 1 if stale or problems else 0
+
+
 def main(argv):
-    if len(argv) < 2 or argv[1] not in {"which", "map", "check", "changed"}:
+    if len(argv) < 2 or argv[1] not in {"which", "map", "check", "changed", "stale"}:
         print(__doc__)
         return 2
     files = tracked_files()
@@ -153,6 +182,8 @@ def main(argv):
         return cmd_map(docs)
     if cmd == "check":
         return cmd_check(files, docs)
+    if cmd == "stale":
+        return cmd_stale(docs)
     return cmd_changed(argv[2] if len(argv) > 2 else "origin/HEAD", docs)
 
 

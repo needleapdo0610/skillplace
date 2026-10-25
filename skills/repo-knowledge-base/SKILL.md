@@ -21,7 +21,7 @@ re-deriving it by scanning the repo.
   Related. Template: `references/context-template.md`.
 - Every claim cites evidence (`path:symbol`, sha, ticket, test). Unknown reason → "Why: not
   recorded (<sha>)". Fabricated whys are worse than none.
-- Tool: `scripts/kb.py` (stdlib Python): `which`, `map`, `check`, `changed`.
+- Tool: `scripts/kb.py` (stdlib Python): `which`, `map`, `check`, `changed`, `stale`.
 
 ## Mode A — Bootstrap a repo from zero (~1–3 h wall clock for a mid-size repo)
 
@@ -71,6 +71,6 @@ re-deriving it by scanning the repo.
 
 ## Mode C — Audit drift
 
-Run `kb.py check`. For docs whose covered files have commits newer than `last_verified`
-(`git log --since=<date> -- <covers>`), re-run the bootstrap workflow on just those modules
+Run `kb.py check`, then `kb.py stale` (lists docs whose covered files have commits after the
+doc's `last_verified: <date> @ <sha>`; exit 1 if any). For each stale doc, re-run the bootstrap workflow on just those modules
 (same args, filtered `modules`), then review the diff of each doc.
